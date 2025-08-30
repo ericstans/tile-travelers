@@ -8,7 +8,7 @@ createApp(App).mount('#app');
 
 
 
-import { levels, currentLevel, boardRows, boardCols, buildings, setLevel } from './gameState.js';
+import { levels, currentLevel, boardRows, boardCols, buildings, setLevel, selectedBuilding, freeBuild, setSelectedBuilding, buildingTypes } from './gameState.js';
 // --- Animated Text Effect ---
 function showAnimatedText(message, options = {}) {
     // Remove any existing animated text
@@ -73,7 +73,7 @@ if (!endTurnBtn) {
 endTurnBtn.onclick = () => {
     turnHasMoved = false;
     turnHasBuilt = false;
-    selectedBuilding = null;
+    setSelectedBuilding(null);
     // Deselect all building bar buttons
     const bar = document.getElementById('building-bar');
     if (bar) {
@@ -322,26 +322,7 @@ function makeGrassBuffer(bgType) {
 
 
     // --- Building types ---
-    const buildingTypes = [
-    { id: 'house', name: 'House', icon: '🏠', resourceEffect: 'POP+1;FUD-1/t', desc: 'Lorem ipsum dolor sit amet.', price: 3 },
-    { id: 'tree', name: 'Tree', icon: '🌳', resourceEffect: 'HPY+1', desc: 'Lorem ipsum dolor sit amet.', price: 2 },
-    { id: 'well', name: 'Well', icon: '⛲', resourceEffect: 'HPY+1', desc: 'Lorem ipsum dolor sit amet.', price: 4 },
-    { id: 'windmill', name: 'Windmill', icon: '🌬️', resourceEffect: 'FUD+1/t', desc: 'Lorem ipsum dolor sit amet.', price: 2 },
-    { id: 'farm', name: 'Farm', icon: '🏚️', resourceEffect: 'FUD+3/t', desc: 'Lorem ipsum dolor sit amet.', price: 5 },
-    { id: 'castle', name: 'Castle', icon: '🏰', resourceEffect: 'POP+2', desc: 'Lorem ipsum dolor sit amet.', price: 30 },
-    { id: 'shop', name: 'Shop', icon: '🏪', resourceEffect: 'GLD+2', desc: 'Lorem ipsum dolor sit amet.', price: 8 },
-    { id: 'factory', name: 'Factory', icon: '🏭', resourceEffect: 'GLD+2;HPY-1/t', desc: 'Lorem ipsum dolor sit amet.', price: 12 },
-    { id: 'lighthouse', name: 'Lighthouse', icon: '🗼', resourceEffect: 'WIS+1', desc: 'Lorem ipsum dolor sit amet.', price: 7 },
-    { id: 'hotspring', name: 'Hot Spring', icon: '♨️', resourceEffect: 'HPY+2', desc: 'Lorem ipsum dolor sit amet.', price: 10 },
-    { id: 'library', name: 'Library', icon: '📚', resourceEffect: 'WIS+2', desc: 'Lorem ipsum dolor sit amet.', price: 15 },
-    { id: 'portal', name: 'Portal', icon: '🌀', resourceEffect: 'WIS+1', desc: 'Lorem ipsum dolor sit amet.', price: 18 },
-    { id: 'volcano', name: 'Volcano', icon: '🌋', resourceEffect: 'HPY-1', desc: 'Lorem ipsum dolor sit amet.', price: 25 },
-    { id: 'aquarium', name: 'Aquarium', icon: '🐠', resourceEffect: 'HPY+1', desc: 'Lorem ipsum dolor sit amet.', price: 9 },
-    { id: 'zengarden', name: 'Zen Garden', icon: '🪴', resourceEffect: 'HPY+2', desc: 'Lorem ipsum dolor sit amet.', price: 11 },
-    { id: 'ferriswheel', name: 'Ferris Wheel', icon: '🎡', resourceEffect: 'HPY+2', desc: 'Lorem ipsum dolor sit amet.', price: 50 },
-    { id: 'hauntedhouse', name: 'Haunted House', icon: '👻', resourceEffect: 'HPY-2', desc: 'Lorem ipsum dolor sit amet.', price: 20 },
-    ];
-    let selectedBuilding = null;
+    // buildingTypes, selectedBuilding, and freeBuild are now imported from gameState.js
     // buildings is now imported from gameState.js
 
     // --- Bob's state ---
@@ -694,7 +675,7 @@ canvas.addEventListener('click', function (e) {
                             if (applied) updateResourceDisplay();
                         }
                         if (!freeBuild) {
-                            selectedBuilding = null;
+                            setSelectedBuilding(null);
                             turnHasBuilt = true;
                             disableBuildingBar();
                             // Deselect all building bar buttons
@@ -809,11 +790,11 @@ if (bar) {
             if (turnHasBuilt && !freeBuild) return; // Disable if already built this turn, unless freeBuild
             // If already selected, de-select
             if (selectedBuilding === b) {
-                selectedBuilding = null;
+                setSelectedBuilding(null);
                 Array.from(bar.children).forEach(el => el.classList.remove('selected'));
                 return;
             }
-            selectedBuilding = b;
+            setSelectedBuilding(b);
             // Highlight selected
             Array.from(bar.children).forEach((el, idx) => {
                 if (idx === i) {
@@ -828,7 +809,7 @@ if (bar) {
 }
 
 // --- Free Building UI ---
-let freeBuild = false;
+// freeBuild is now imported from gameState.js
 let freeBuildCheckbox = document.getElementById('free-build-checkbox');
 if (!freeBuildCheckbox) {
     freeBuildCheckbox = document.createElement('input');
