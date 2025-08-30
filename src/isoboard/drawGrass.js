@@ -1,5 +1,6 @@
-import { drawGrassClassic, drawGrassDemoscene, drawGrassDemoscene2, drawDesertOptimized, drawGrassOptimized } from './backgrounds';
-
+import { drawGrassClassic, drawGrassDemoscene, drawGrassDemoscene2, drawDesertOptimized, drawGrassOptimized, drawShimmerWhite } from './backgrounds';
+const CANVAS_WIDTH = 750;
+const CANVAS_HEIGHT = 500;
 // --- Background mode switching ---
 // Background mode is now managed by Vue in BackgroundModeBar.vue
 export let backgroundMode = 'optimized';
@@ -24,3 +25,4 @@ export function drawGrass(ctx, time) {
             drawGrassOptimized(ctx, time); break;
     }
 }
+
