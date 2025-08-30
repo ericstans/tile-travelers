@@ -9,7 +9,7 @@
 </template>
 
 <script>
-import { setBackgroundMode } from '../isoboard/drawGrass.js';
+import { setBackgroundMode } from '../utils/drawGrass.js';
 export default {
   name: 'BackgroundModeBar',
   data() {

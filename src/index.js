@@ -1,14 +1,13 @@
 import { createApp } from 'vue';
 import App from './App.vue';
-import { drawGrass, grassBuffer, desertBuffer, drawShimmerWhite } from './isoboard/drawGrass.js';
-import SoundEffects from './isoboard/soundEffects.js';
-import './isoboard/background-mode-bar.css';
+import { drawGrass, grassBuffer, desertBuffer, drawShimmerWhite } from './utils/drawGrass.js';
+import SoundEffects from './utils/soundEffects.js';
+import './utils/background-mode-bar.css';
 import './styles.css';
 createApp(App).mount('#app');
 
 
-
-import { levels, currentLevel, boardRows, boardCols, buildings, setLevel, selectedBuilding, freeBuild, setSelectedBuilding, buildingTypes } from './gameState.js';
+import { boardRows, boardCols, buildings, selectedBuilding, freeBuild, setSelectedBuilding, buildingTypes } from './gameState.js';
 // --- Animated Text Effect ---
 function showAnimatedText(message, options = {}) {
     // Remove any existing animated text
