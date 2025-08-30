@@ -1,5 +1,4 @@
 <template>
-  <div id="app"></div>
   <div id="building-bar"></div>
   <div id="level-bar" style="margin: 0 auto 16px auto; text-align: center;">
     <label for="level-select">Level:</label>

@@ -232,7 +232,7 @@ if (!canvas) {
     canvas.style.margin = '40px auto';
     canvas.style.background = '#f9f9f9';
     canvas.style.border = '1px solid #bbb';
-    app.appendChild(canvas);
+    app.insertBefore(canvas, app.firstChild);
 } else {
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
