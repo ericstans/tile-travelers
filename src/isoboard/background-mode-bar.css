@@ -1,17 +1,17 @@
 /* Styles for the background mode dropdown */
 #background-mode-bar {
-	display: flex;
-	justify-content: center;
-	margin: 0 auto 24px auto;
-	padding: 0 0 12px 0;
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 24px auto;
+  padding: 0 0 12px 0;
 }
 #background-mode-bar label {
-	font-size: 1rem;
-	margin-right: 8px;
+  font-size: 1rem;
+  margin-right: 8px;
 }
 #background-mode-bar select {
-	font-size: 1rem;
-	padding: 4px 8px;
-	border-radius: 4px;
-	border: 1px solid #bbb;
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #bbb;
 }
