@@ -14,7 +14,7 @@ export default {
   name: 'BackgroundModeBar',
   data() {
     return {
-      selected: 'optimized',
+      selected: 'classic',
       options: [
         { value: 'optimized', label: 'Optimized (Grass Green)' },
         { value: 'desert', label: 'Desert' },
