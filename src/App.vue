@@ -1,26 +1,27 @@
 <template>
-  <div id="building-bar"></div>
-  <div id="level-bar" style="margin: 0 auto 16px auto; text-align: center;">
-    <label for="level-select">Level:</label>
-    <select id="level-select">
-      <option value="1">Level 1</option>
-      <option value="2">Level 2</option>
-    </select>
+  <div id="app">
+    <CanvasArea />
+    <BuildingBar />
+    <LevelBar />
+    <BackgroundModeBar />
+    <link rel="stylesheet" href="../src/background-mode-bar.css">
   </div>
-  <div id="background-mode-bar">
-    <label for="background-mode-select">Background:</label>
-    <select id="background-mode-select">
-      <option value="optimized">Optimized (fast)</option>
-      <option value="classic">Classic (per-frame)</option>
-    </select>
-  </div>
-
-  <link rel="stylesheet" href="../src/background-mode-bar.css">
 </template>
 
 <script>
+import CanvasArea from './components/CanvasArea.vue';
+import BuildingBar from './components/BuildingBar.vue';
+import LevelBar from './components/LevelBar.vue';
+import BackgroundModeBar from './components/BackgroundModeBar.vue';
+
 export default {
   name: 'App',
+  components: {
+    CanvasArea,
+    BuildingBar,
+    LevelBar,
+    BackgroundModeBar
+  },
   mounted() {
     // Import isoboard logic after DOM is ready
     import('./index.js');
