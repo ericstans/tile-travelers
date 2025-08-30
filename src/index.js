@@ -6,6 +6,9 @@ import './isoboard/background-mode-bar.css';
 import './styles.css';
 createApp(App).mount('#app');
 
+
+
+import { levels, currentLevel, boardRows, boardCols, buildings, setLevel } from './gameState.js';
 // --- Animated Text Effect ---
 function showAnimatedText(message, options = {}) {
     // Remove any existing animated text
@@ -292,14 +295,7 @@ function makeGrassBuffer(bgType) {
     const skew = 0.5; // 0.5 = 45° cavalier, 0.25 = 26.6° cabinet
     const tileSize = 96; // double the previous 48
     const depth = 48;    // double the previous 24
-    // Level definitions (can expand later)
-    const levels = [
-        { rows: 5, cols: 5 }, // Level 1
-        { rows: 5, cols: 10 }, // Level 2 (10x5)
-    ];
-    let currentLevel = 0;
-    let boardRows = levels[currentLevel].rows;
-    let boardCols = levels[currentLevel].cols;
+    // boardRows and boardCols are now imported from gameState.js
 
 
     // Calculate the projected width and height of the board
@@ -346,32 +342,14 @@ function makeGrassBuffer(bgType) {
     { id: 'hauntedhouse', name: 'Haunted House', icon: '👻', resourceEffect: 'HPY-2', desc: 'Lorem ipsum dolor sit amet.', price: 20 },
     ];
     let selectedBuilding = null;
-    let buildings = Array.from({ length: boardRows }, () => Array(boardCols).fill(null));
+    // buildings is now imported from gameState.js
 
     // --- Bob's state ---
     let bobPos = { x: 2, y: 2 };
 // --- Level dropdown UI ---
-const levelSelect = document.getElementById('level-select');
-if (levelSelect) {
-    levelSelect.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.value, 10) - 1;
-        if (idx >= 0 && idx < levels.length) {
-            currentLevel = idx;
-            boardRows = levels[currentLevel].rows;
-            boardCols = levels[currentLevel].cols;
-            buildings = Array.from({ length: boardRows }, () => Array(boardCols).fill(null));
-            // Place Bob at the center of the board for any level
-            bobPos = {
-                x: Math.floor(boardCols / 2),
-                y: Math.floor(boardRows / 2)
-            };
-            // Reset resources to 0 on level change
-            resources = { pop: 0, fud: 0, gld: 5, hpy: 0, wis: 0 };
-            updateResourceDisplay();
-            draw();
-        }
-    });
-}
+// Level selection is now managed by Vue in LevelBar.vue
+
+// setLevel is now imported from gameState.js
     let bobSelected = false;
     let bobAnim = null; // {from: {x,y}, to: {x,y}, start: time, duration: ms}
 
