@@ -1,6 +1,6 @@
 export const grassPixel = 10;
-const CANVAS_WIDTH = 750;
-const CANVAS_HEIGHT = 500;
+const CANVAS_WIDTH = 1200;
+const CANVAS_HEIGHT = 800;
 // Optimized desert background (sandy look)
 export function drawDesertOptimized(ctx, time) {
     ctx.drawImage(desertBuffer, 0, 0);

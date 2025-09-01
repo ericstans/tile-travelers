@@ -6,226 +6,14 @@ import './utils/background-mode-bar.css';
 import './styles.css';
 createApp(App).mount('#app');
 
+import { boardRows, boardCols, boardTiles } from './gameState.js';
 
-import { boardRows, boardCols, buildings, selectedBuilding, freeBuild, setSelectedBuilding, buildingTypes } from './gameState.js';
-// --- Animated Text Effect ---
-function showAnimatedText(message, options = {}) {
-    // Remove any existing animated text
-    let existing = document.getElementById('animated-text-effect');
-    if (existing) existing.remove();
-    const div = document.createElement('div');
-    div.id = 'animated-text-effect';
-    div.textContent = message;
-    div.style.position = 'fixed';
-    div.style.left = '50%';
-    div.style.top = options.top || '22%';
-    div.style.transform = 'translate(-50%, 0) scale(1)';
-    div.style.fontSize = options.fontSize || '2.6rem';
-    div.style.fontWeight = 'bold';
-    div.style.color = options.color || '#f7b300';
-    div.style.textShadow = '0 2px 12px #000a, 0 0 2px #fff8';
-    div.style.opacity = '0';
-    div.style.pointerEvents = 'none';
-    div.style.zIndex = 1000;
-    div.style.transition = 'opacity 0.25s, transform 0.7s cubic-bezier(.2,1.2,.4,1)';
-    document.body.appendChild(div);
-    // Animate in
-    setTimeout(() => {
-        div.style.opacity = '1';
-        div.style.transform = 'translate(-50%, 0) scale(1.12)';
-    }, 10);
-    // Animate out
-    setTimeout(() => {
-        div.style.opacity = '0';
-        div.style.transform = 'translate(-50%, -40px) scale(0.92)';
-    }, options.duration || 1400);
-    // Remove after animation
-    setTimeout(() => {
-        if (div.parentNode) div.parentNode.removeChild(div);
-    }, (options.duration || 1400) + 600);
-}
-// --- Turn system ---
-let turnHasMoved = false;
-let turnHasBuilt = false;
-
-// Add End Turn button
-let endTurnBtn = document.getElementById('end-turn-btn');
-if (!endTurnBtn) {
-    endTurnBtn = document.createElement('button');
-    endTurnBtn.id = 'end-turn-btn';
-    endTurnBtn.textContent = 'End Turn';
-    endTurnBtn.style.position = 'absolute';
-    endTurnBtn.style.top = '24px';
-    endTurnBtn.style.right = '36px';
-    endTurnBtn.style.zIndex = 10;
-    endTurnBtn.style.fontSize = '1.2rem';
-    endTurnBtn.style.padding = '8px 18px';
-    endTurnBtn.style.background = '#eee';
-    endTurnBtn.style.border = '2px solid #bbb';
-    endTurnBtn.style.borderRadius = '8px';
-    endTurnBtn.style.boxShadow = '0 2px 8px #0001';
-    endTurnBtn.style.cursor = 'pointer';
-    endTurnBtn.style.fontWeight = 'bold';
-    endTurnBtn.style.opacity = '0.97';
-    document.body.appendChild(endTurnBtn);
-}
-endTurnBtn.onclick = () => {
-    turnHasMoved = false;
-    turnHasBuilt = false;
-    setSelectedBuilding(null);
-    // Deselect all building bar buttons
-    const bar = document.getElementById('building-bar');
-    if (bar) {
-        Array.from(bar.children).forEach(el => el.classList.remove('selected'));
-    }
-    // --- Per-turn resource effects ---
-    let perTurnEffects = [];
-    let perTurnBuildingAnims = [];
-    for (let y = 0; y < boardRows; y++) {
-        for (let x = 0; x < boardCols; x++) {
-            const b = buildings[y][x];
-            if (b && b.resourceEffect && /\/t$/.test(b.resourceEffect)) {
-                // Generalize for any per-turn effect
-                const match = b.resourceEffect.match(/(POP|GLD|FUD|HPY|WIS)([+-]\d+)\/t/i);
-                if (match) {
-                    const key = match[1].toLowerCase();
-                    const delta = parseInt(match[2], 10);
-                    if (resources.hasOwnProperty(key)) {
-                        perTurnEffects.push({ key, delta });
-                        perTurnBuildingAnims.push({ x, y, delta, key, icon: b.icon });
-                    }
-                }
-            }
-        }
-    }
-    // Animate per-turn effect above each building
-    perTurnBuildingAnims.forEach(({ x, y, delta, key, icon }) => {
-        animateBuildingPerTurnEffect(x, y, delta, key, icon);
-    });
-    // Sum all effects by resource type
-    const effectTotals = {};
-    perTurnEffects.forEach(e => {
-        effectTotals[e.key] = (effectTotals[e.key] || 0) + e.delta;
-    });
-    // Apply and animate if any
-    let perTurnMsg = [];
-    for (const key in effectTotals) {
-        resources[key] += effectTotals[key];
-        perTurnMsg.push(`${key.toUpperCase()} ${effectTotals[key] > 0 ? '+' : ''}${effectTotals[key]}`);
-    }
-    if (perTurnMsg.length > 0) {
-        showAnimatedText(perTurnMsg.join('  '), { color: '#2a2', fontSize: '2.1rem', top: '32%' });
-    }
-    updateResourceDisplay();
-// Animate per-turn resource effect above a building at board (x, y)
-function animateBuildingPerTurnEffect(x, y, delta, key, icon) {
-    // Map resource key to emoji
-    const resourceEmojis = {
-        pop: '👥',
-        gld: '💰',
-        fud: '🍔',
-        hpy: '😊',
-        wis: '📜'
-    };
-    const emoji = resourceEmojis[key] || '';
-    // Project the building's center to canvas coordinates
-    const center = obliqueProjectCentered(x + 0.5, y + 0.1); // slightly above the building
-    // Convert canvas coordinates to page coordinates
-    const canvasRect = canvas.getBoundingClientRect();
-    const pageX = canvasRect.left + window.scrollX + center.x;
-    const pageY = canvasRect.top + window.scrollY + center.y;
-    const div = document.createElement('div');
-    div.textContent = `${delta > 0 ? '+' : ''}${emoji}${Math.abs(delta)}`;
-    div.style.position = 'absolute';
-    div.style.left = `${pageX}px`;
-    div.style.top = `${pageY}px`;
-    div.style.transform = 'translate(-50%, 0) scale(1)';
-    div.style.fontSize = '1.25rem';
-    div.style.fontWeight = 'bold';
-    div.style.color = delta < 0 ? '#d22' : '#2a2';
-    div.style.textShadow = '0 2px 8px #fff, 0 0 2px #0008';
-    div.style.opacity = '0';
-    div.style.pointerEvents = 'none';
-    div.style.zIndex = 1001;
-    div.style.transition = 'opacity 0.18s, transform 0.7s cubic-bezier(.2,1.2,.4,1)';
-    document.body.appendChild(div);
-    // Animate in
-    setTimeout(() => {
-        div.style.opacity = '1';
-        div.style.transform = 'translate(-50%, -18px) scale(1.18)';
-    }, 10);
-    // Animate out
-    setTimeout(() => {
-        div.style.opacity = '0';
-        div.style.transform = 'translate(-50%, -48px) scale(0.92)';
-    }, 900);
-    // Remove after animation
-    setTimeout(() => {
-        if (div.parentNode) div.parentNode.removeChild(div);
-    }, 1500);
-}
-    enableBuildingBar();
-    showAnimatedText('Turn Ended');
-    draw();
-};
-
-function enableBuildingBar() {
-    const bar = document.getElementById('building-bar');
-    if (bar) {
-        Array.from(bar.children).forEach((btn, i) => {
-            // Find the corresponding building type
-            const b = buildingTypes[i];
-            if (!freeBuild && b.price > resources.gld) {
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-            } else {
-                btn.disabled = false;
-                btn.style.opacity = '';
-                btn.style.pointerEvents = '';
-            }
-        });
-    }
-}
-function disableBuildingBar() {
-    if (freeBuild) return;
-    const bar = document.getElementById('building-bar');
-    if (bar) {
-        Array.from(bar.children).forEach(btn => {
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            btn.style.pointerEvents = 'none';
-        });
-    }
-}
-// --- Resource system ---
-let resources = {
-    pop: 0,
-    fud: 0,
-    gld: 5,
-    hpy: 0,
-    wis: 0
-};
-
-function updateResourceDisplay() {
-    const popEl = document.getElementById('resource-pop');
-    const gldEl = document.getElementById('resource-gld');
-    const hpyEl = document.getElementById('resource-hpy');
-    const wisEl = document.getElementById('resource-wis');
-    if (popEl) popEl.textContent = `POP: ${resources.pop}`;
-    if (gldEl) gldEl.textContent = `GLD: ${resources.gld}`;
-    if (hpyEl) hpyEl.textContent = `HPY: ${resources.hpy}`;
-    if (wisEl) wisEl.textContent = `WIS: ${resources.wis}`;
-}
-
-// Initialize resource display on load
-updateResourceDisplay();
 // Only create and append a canvas if one does not already exist in #app
 const app = document.getElementById('app');
 let canvas = app.querySelector('canvas');
-// 25% larger canvas (same aspect ratio as 600x400)
-export const CANVAS_WIDTH = 750;
-export const CANVAS_HEIGHT = 500;
+// Larger canvas for 20x20 board
+export const CANVAS_WIDTH = 1200;
+export const CANVAS_HEIGHT = 800;
 if (!canvas) {
     canvas = document.createElement('canvas');
     canvas.width = CANVAS_WIDTH;
@@ -239,7 +27,6 @@ if (!canvas) {
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
 }
-
 
 export const ctx = canvas.getContext('2d');
 
@@ -289,247 +76,416 @@ function makeGrassBuffer(bgType) {
     return buffer;
 }
 
-    // Oblique projection parameters
+// Oblique projection parameters
+const skew = 0.5; // 0.5 = 45° cavalier, 0.25 = 26.6° cabinet
+const tileSize = 96; // double the previous 48
+const depth = 48;    // double the previous 24
 
-    const skew = 0.5; // 0.5 = 45° cavalier, 0.25 = 26.6° cabinet
-    const tileSize = 96; // double the previous 48
-    const depth = 48;    // double the previous 24
-    // boardRows and boardCols are now imported from gameState.js
+// Calculate the projected width and height of the board
+function obliqueProject(x, y) {
+    return {
+        x: x * tileSize + y * depth * skew,
+        y: y * tileSize - y * depth
+    };
+}
 
+// Center the board in the canvas
+function obliqueProjectCentered(x, y) {
+    const proj = obliqueProject(x, y);
+    // Project the four corners of the board to get bounds
+    const topLeft = obliqueProject(0, 0);
+    const bottomRight = obliqueProject(boardCols, boardRows);
+    const boardPixelWidth = bottomRight.x - topLeft.x;
+    const boardPixelHeight = bottomRight.y - topLeft.y;
+    return {
+        x: proj.x + (CANVAS_WIDTH - boardPixelWidth) / 2 - topLeft.x,
+        y: proj.y + (CANVAS_HEIGHT - boardPixelHeight) / 2 - topLeft.y
+    };
+}
 
-    // Calculate the projected width and height of the board
-    function obliqueProject(x, y) {
-        return {
-            x: x * tileSize + y * depth * skew,
-            y: y * tileSize - y * depth
-        };
+// --- Bob's state ---
+let bobPos = { x: 2, y: 2 };
+let bobSelected = false;
+let bobAnim = null; // {from: {x,y}, to: {x,y}, start: time, duration: ms}
+
+// --- Bob AI state ---
+let bobTarget = null; // {x, y} - Bob's current target
+let bobMoving = false; // Whether Bob is currently moving toward a target
+let bobPath = []; // Current path to target
+let bobPathIndex = 0; // Current position in path
+
+// --- Bob AI Functions ---
+function findPath(start, target) {
+    // Simple pathfinding for rook movement
+    // First try to move horizontally, then vertically
+    const path = [];
+    let current = { ...start };
+    
+    // Move horizontally first
+    while (current.x !== target.x) {
+        const nextX = current.x + (target.x > current.x ? 1 : -1);
+        if (boardTiles[current.y] && boardTiles[current.y][nextX]) {
+            current.x = nextX;
+            path.push({ ...current });
+        } else {
+            // Can't move horizontally, try vertical approach
+            return findPathVertical(start, target);
+        }
     }
-
-    // Center the board in the canvas
-    function obliqueProjectCentered(x, y) {
-        const proj = obliqueProject(x, y);
-        // Project the four corners of the board to get bounds
-        const topLeft = obliqueProject(0, 0);
-        const bottomRight = obliqueProject(boardCols, boardRows);
-        const boardPixelWidth = bottomRight.x - topLeft.x;
-        const boardPixelHeight = bottomRight.y - topLeft.y;
-        return {
-            x: proj.x + (CANVAS_WIDTH - boardPixelWidth) / 2 - topLeft.x,
-            y: proj.y + (CANVAS_HEIGHT - boardPixelHeight) / 2 - topLeft.y
-        };
+    
+    // Then move vertically
+    while (current.y !== target.y) {
+        const nextY = current.y + (target.y > current.y ? 1 : -1);
+        if (boardTiles[nextY] && boardTiles[nextY][current.x]) {
+            current.y = nextY;
+            path.push({ ...current });
+        } else {
+            // Can't reach target
+            return null;
+        }
     }
+    
+    return path;
+}
 
+function findPathVertical(start, target) {
+    // Alternative pathfinding: move vertically first, then horizontally
+    const path = [];
+    let current = { ...start };
+    
+    // Move vertically first
+    while (current.y !== target.y) {
+        const nextY = current.y + (target.y > current.y ? 1 : -1);
+        if (boardTiles[nextY] && boardTiles[nextY][current.x]) {
+            current.y = nextY;
+            path.push({ ...current });
+        } else {
+            return null;
+        }
+    }
+    
+    // Then move horizontally
+    while (current.x !== target.x) {
+        const nextX = current.x + (target.x > current.x ? 1 : -1);
+        if (boardTiles[current.y] && boardTiles[current.y][nextX]) {
+            current.x = nextX;
+            path.push({ ...current });
+        } else {
+            return null;
+        }
+    }
+    
+    return path;
+}
 
-    // --- Building types ---
-    // buildingTypes, selectedBuilding, and freeBuild are now imported from gameState.js
-    // buildings is now imported from gameState.js
+function chooseRandomTarget() {
+    // Find Bob's current projected position for camera calculations
+    const bobProj = obliqueProjectCentered(bobPos.x + 0.5, bobPos.y + 0.5);
+    
+    // Calculate camera offset (same logic as in draw function)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let y = 0; y < boardRows; y++) {
+        for (let x = 0; x < boardCols; x++) {
+            if (boardTiles[y][x] && ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x))) {
+                const proj = obliqueProjectCentered(x + 0.5, y + 0.5);
+                minX = Math.min(minX, proj.x);
+                minY = Math.min(minY, proj.y);
+                maxX = Math.max(maxX, proj.x);
+                maxY = Math.max(maxY, proj.y);
+            }
+        }
+    }
+    
+    let needsScroll = false;
+    if (minX < 0 || maxX > CANVAS_WIDTH || minY < 0 || maxY > CANVAS_HEIGHT) {
+        needsScroll = true;
+    }
+    
+    let camOffsetX = 0, camOffsetY = 0;
+    if (needsScroll) {
+        const targetX = CANVAS_WIDTH / 2;
+        const targetY = CANVAS_HEIGHT / 2;
+        camOffsetX = targetX - bobProj.x;
+        camOffsetY = targetY - bobProj.y;
+    }
+    
+    // Find all reachable tiles, separating on-screen and off-screen
+    const onScreenTiles = [];
+    const offScreenTiles = [];
+    
+    for (let y = 0; y < boardRows; y++) {
+        for (let x = 0; x < boardCols; x++) {
+            if (boardTiles[y][x] && (x !== bobPos.x || y !== bobPos.y)) {
+                // Check if this tile is reachable via rook movement
+                const path = findPath(bobPos, { x, y });
+                if (path && path.length > 0) {
+                    // Check if tile is on-screen or off-screen
+                    const tileProj = obliqueProjectCentered(x + 0.5, y + 0.5);
+                    const screenX = tileProj.x + camOffsetX;
+                    const screenY = tileProj.y + camOffsetY;
+                    
+                    const isOnScreen = screenX >= 0 && screenX <= CANVAS_WIDTH && 
+                                     screenY >= 0 && screenY <= CANVAS_HEIGHT;
+                    
+                    if (isOnScreen) {
+                        onScreenTiles.push({ x, y });
+                    } else {
+                        offScreenTiles.push({ x, y });
+                    }
+                }
+            }
+        }
+    }
+    
+    // Prefer off-screen tiles, fall back to on-screen if none available
+    const targetTiles = offScreenTiles.length > 0 ? offScreenTiles : onScreenTiles;
+    
+    if (targetTiles.length === 0) {
+        return null; // No reachable targets
+    }
+    
+    // Choose a random tile from the preferred set
+    const randomIndex = Math.floor(Math.random() * targetTiles.length);
+    return targetTiles[randomIndex];
+}
 
-    // --- Bob's state ---
-    let bobPos = { x: 2, y: 2 };
-// --- Level dropdown UI ---
-// Level selection is now managed by Vue in LevelBar.vue
+function startBobAI() {
+    if (bobMoving || bobAnim) return; // Already moving
+    
+    const target = chooseRandomTarget();
+    if (!target) {
+        // No reachable targets, try again later
+        setTimeout(startBobAI, 1000);
+        return;
+    }
+    
+    bobTarget = target;
+    const path = findPath(bobPos, target);
+    if (!path || path.length === 0) {
+        // Can't reach target, try again
+        setTimeout(startBobAI, 1000);
+        return;
+    }
+    
+    // Sync target designation sound to next beat
+    const delayToNextBeat = SoundEffects.getNextBeatTime();
+    setTimeout(() => {
+        SoundEffects.playTargetDesignated();
+    }, delayToNextBeat);
+    
+    bobPath = path;
+    bobPathIndex = 0;
+    bobMoving = true;
+    
+    // Start movement on the next eighth note after the sound
+    const delayToNextEighth = SoundEffects.getNextEighthNoteTime();
+    setTimeout(() => {
+        moveBobToNext();
+    }, delayToNextEighth + SoundEffects.EIGHTH_NOTE_MS);
+}
 
-// setLevel is now imported from gameState.js
-    let bobSelected = false;
-    let bobAnim = null; // {from: {x,y}, to: {x,y}, start: time, duration: ms}
+function moveBobToNext() {
+    if (bobPathIndex >= bobPath.length) {
+        // Reached target - sync sound to next beat
+        const delayToNextBeat = SoundEffects.getNextBeatTime();
+        setTimeout(() => {
+            SoundEffects.playTargetReached();
+        }, delayToNextBeat);
+        
+        bobMoving = false;
+        bobTarget = null;
+        bobPath = [];
+        bobPathIndex = 0;
+        
+        // Wait for next beat, then choose a new target
+        setTimeout(startBobAI, delayToNextBeat + SoundEffects.BEAT_DURATION_MS * 2);
+        return;
+    }
+    
+    const nextPos = bobPath[bobPathIndex];
+    const distance = Math.abs(nextPos.x - bobPos.x) + Math.abs(nextPos.y - bobPos.y);
+    
+    // Calculate timing to sync movement with beat
+    const currentTime = Date.now();
+    const delayToNextBeat = SoundEffects.getTimeToNextBeatFromTime(currentTime);
+    
+    // Start movement animation to complete on the next beat
+    const movementStartTime = performance.now();
+    const movementDuration = delayToNextBeat;
+    
+    bobAnim = {
+        from: { ...bobPos },
+        to: { ...nextPos },
+        start: movementStartTime,
+        duration: movementDuration
+    };
+    
+    // Play footstep exactly when movement completes (on the beat)
+    // Use a more precise timing approach
+    const footstepTime = currentTime + delayToNextBeat;
+    const footstepDelay = footstepTime - Date.now();
+    
+    setTimeout(() => {
+        SoundEffects.playFootstep();
+        // Update Bob's position when footstep plays
+        bobPos = { ...nextPos };
+        bobPathIndex++;
+        
+        // Schedule next move to start on the next eighth note
+        const nextMoveTime = footstepTime + SoundEffects.EIGHTH_NOTE_MS;
+        const nextMoveDelay = nextMoveTime - Date.now();
+        setTimeout(moveBobToNext, Math.max(0, nextMoveDelay));
+    }, Math.max(0, footstepDelay));
+}
 
-    function draw(time = performance.now()) {
+function draw(time = performance.now()) {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     drawGrass(ctx, time);
 
-        // Animate Bob if needed
-        let drawBobX = bobPos.x;
-        let drawBobY = bobPos.y;
-        if (bobAnim) {
-            const elapsed = Math.min(time - bobAnim.start, bobAnim.duration);
-            const t = Math.min(1, elapsed / bobAnim.duration);
-            // Ease out cubic for snappy feel
-            const ease = 1 - Math.pow(1 - t, 3);
-            drawBobX = bobAnim.from.x + (bobAnim.to.x - bobAnim.from.x) * ease;
-            drawBobY = bobAnim.from.y + (bobAnim.to.y - bobAnim.from.y) * ease;
-            // Play 3 much slower footstep sounds per move
-            const steps = 3;
-            const stepTimes = [0.28, 0.58, 0.88]; // even more spaced out
-            if (!bobAnim.playedSteps) bobAnim.playedSteps = Array(steps).fill(false);
-            for (let i = 0; i < steps; ++i) {
-                if (!bobAnim.playedSteps[i] && t >= stepTimes[i]) {
-                    SoundEffects.playFootstep();
-                    bobAnim.playedSteps[i] = true;
-                }
-            }
-            if (t >= 1) {
-                bobAnim = null;
-            }
+    // Animate Bob if needed
+    let drawBobX = bobPos.x;
+    let drawBobY = bobPos.y;
+    if (bobAnim) {
+        const elapsed = Math.min(time - bobAnim.start, bobAnim.duration);
+        const t = Math.min(1, elapsed / bobAnim.duration);
+        // Ease out cubic for snappy feel
+        const ease = 1 - Math.pow(1 - t, 3);
+        drawBobX = bobAnim.from.x + (bobAnim.to.x - bobAnim.from.x) * ease;
+        drawBobY = bobAnim.from.y + (bobAnim.to.y - bobAnim.from.y) * ease;
+        // Footsteps are now played when reaching squares, not during animation
+        if (t >= 1) {
+            bobAnim = null;
         }
+    }
 
-        // --- Camera scroll logic ---
-        // Find Bob's projected center
-        const bobProj = obliqueProjectCentered(drawBobX + 0.5, drawBobY + 0.5);
-        // Find all navigable squares from Bob's position (rook moves)
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (let y = 0; y < boardRows; y++) {
-            for (let x = 0; x < boardCols; x++) {
-                if ((x === Math.round(drawBobX) && y !== Math.round(drawBobY)) || (y === Math.round(drawBobY) && x !== Math.round(drawBobX))) {
-                    const proj = obliqueProjectCentered(x + 0.5, y + 0.5);
-                    minX = Math.min(minX, proj.x);
-                    minY = Math.min(minY, proj.y);
-                    maxX = Math.max(maxX, proj.x);
-                    maxY = Math.max(maxY, proj.y);
-                }
+    // --- Camera scroll logic ---
+    // Find Bob's projected center
+    const bobProj = obliqueProjectCentered(drawBobX + 0.5, drawBobY + 0.5);
+    // Find all navigable squares from Bob's position (rook moves)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let y = 0; y < boardRows; y++) {
+        for (let x = 0; x < boardCols; x++) {
+            // Only consider existing tiles that are in the same row or column as Bob
+            if (boardTiles[y][x] && ((x === Math.round(drawBobX) && y !== Math.round(drawBobY)) || (y === Math.round(drawBobY) && x !== Math.round(drawBobX)))) {
+                const proj = obliqueProjectCentered(x + 0.5, y + 0.5);
+                minX = Math.min(minX, proj.x);
+                minY = Math.min(minY, proj.y);
+                maxX = Math.max(maxX, proj.x);
+                maxY = Math.max(maxY, proj.y);
             }
         }
-        // Check if any navigable square is outside the canvas
-        let needsScroll = false;
-        if (minX < 0 || maxX > CANVAS_WIDTH || minY < 0 || maxY > CANVAS_HEIGHT) {
-            needsScroll = true;
-        }
-        let camOffsetX = 0, camOffsetY = 0;
-        if (needsScroll) {
-            // Target center (canvas center)
-            const targetX = CANVAS_WIDTH / 2;
-            const targetY = CANVAS_HEIGHT / 2;
-            camOffsetX = targetX - bobProj.x;
-            camOffsetY = targetY - bobProj.y;
-        }
-        ctx.save();
-        ctx.translate(camOffsetX, camOffsetY);
+    }
+    // Check if any navigable square is outside the canvas
+    let needsScroll = false;
+    if (minX < 0 || maxX > CANVAS_WIDTH || minY < 0 || maxY > CANVAS_HEIGHT) {
+        needsScroll = true;
+    }
+    let camOffsetX = 0, camOffsetY = 0;
+    if (needsScroll) {
+        // Target center (canvas center)
+        const targetX = CANVAS_WIDTH / 2;
+        const targetY = CANVAS_HEIGHT / 2;
+        camOffsetX = targetX - bobProj.x;
+        camOffsetY = targetY - bobProj.y;
+    }
+    ctx.save();
+    ctx.translate(camOffsetX, camOffsetY);
 
-        // Draw the board as a grid of parallelogram tiles
-        for (let y = 0; y < boardRows; y++) {
-            for (let x = 0; x < boardCols; x++) {
-                // Four corners of the tile
-                const p0 = obliqueProjectCentered(x, y);
-                const p1 = obliqueProjectCentered(x + 1, y);
-                const p2 = obliqueProjectCentered(x + 1, y + 1);
-                const p3 = obliqueProjectCentered(x, y + 1);
+    // Draw the board as a grid of parallelogram tiles
+    for (let y = 0; y < boardRows; y++) {
+        for (let x = 0; x < boardCols; x++) {
+            // Only draw tiles that exist
+            if (!boardTiles[y][x]) continue;
+            
+            // Four corners of the tile
+            const p0 = obliqueProjectCentered(x, y);
+            const p1 = obliqueProjectCentered(x + 1, y);
+            const p2 = obliqueProjectCentered(x + 1, y + 1);
+            const p3 = obliqueProjectCentered(x, y + 1);
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineTo(p3.x, p3.y);
+            ctx.closePath();
+            // Highlight valid rook moves if Bob is selected
+            let isRookMove = false;
+            if (bobSelected && ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x))) {
+                isRookMove = true;
+                ctx.fillStyle = 'rgba(100,200,255,0.35)';
+                ctx.fill();
+            }
+            
+            // Highlight target square in red
+            let isTarget = false;
+            if (bobTarget && x === bobTarget.x && y === bobTarget.y) {
+                isTarget = true;
+                ctx.fillStyle = 'rgba(255,100,100,0.6)';
+                ctx.fill();
+            }
+            
+            ctx.strokeStyle = '#333';
+            ctx.stroke();
+            ctx.fillStyle = (x + y) % 2 === 0 ? '#eaeaea' : '#d0d0d0';
+            if (!isRookMove && !isTarget) ctx.fill();
+
+            // Draw Bob if he's on this tile (rounded to nearest int for animation)
+            if (Math.round(drawBobX) === x && Math.round(drawBobY) === y) {
+                const bob0 = obliqueProjectCentered(drawBobX, drawBobY);
+                const bob1 = obliqueProjectCentered(drawBobX + 1, drawBobY);
+                const bob2 = obliqueProjectCentered(drawBobX + 1, drawBobY + 1);
+                const bob3 = obliqueProjectCentered(drawBobX, drawBobY + 1);
+                const bobCenterX = (bob0.x + bob1.x + bob2.x + bob3.x) / 4;
+                const bobCenterY = (bob0.y + bob1.y + bob2.y + bob3.y) / 4;
+                const bobYOffset = -tileSize * 0.25 - 8; // Move Bob up 8px
+                ctx.fillStyle = '#f66';
                 ctx.beginPath();
-                ctx.moveTo(p0.x, p0.y);
-                ctx.lineTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.lineTo(p3.x, p3.y);
-                ctx.closePath();
-                // Highlight valid rook moves if Bob is selected
-                let isRookMove = false;
-                let isBuildable = false;
-                if (bobSelected && ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x))) {
-                    isRookMove = true;
-                    ctx.fillStyle = 'rgba(100,200,255,0.35)';
-                    ctx.fill();
-                }
-                // Highlight buildable tiles if a building is selected
-                if (
-                    selectedBuilding &&
-                    !buildings[y][x] &&
-                    (
-                        (freeBuild && !(bobPos.x === x && bobPos.y === y)) ||
-                        (!freeBuild && (Math.abs(x - bobPos.x) + Math.abs(y - bobPos.y) === 1) && !(bobPos.x === x && bobPos.y === y))
-                    )
-                ) {
-                    isBuildable = true;
-                    ctx.fillStyle = 'rgba(255, 200, 80, 0.38)';
-                    ctx.fill();
-                }
-                ctx.strokeStyle = '#333';
+                ctx.arc(bobCenterX, bobCenterY + bobYOffset, 32, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = '#a33';
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.moveTo(bobCenterX - 12, bobCenterY + bobYOffset + 28);
+                ctx.lineTo(bobCenterX - 12, bobCenterY + bobYOffset + 48);
+                ctx.moveTo(bobCenterX + 12, bobCenterY + bobYOffset + 28);
+                ctx.lineTo(bobCenterX + 12, bobCenterY + bobYOffset + 48);
                 ctx.stroke();
-                ctx.fillStyle = (x + y) % 2 === 0 ? '#eaeaea' : '#d0d0d0';
-                if (!isRookMove && !isBuildable) ctx.fill();
-
-                // Draw Bob if he's on this tile (rounded to nearest int for animation)
-                if (Math.round(drawBobX) === x && Math.round(drawBobY) === y) {
-                    const bob0 = obliqueProjectCentered(drawBobX, drawBobY);
-                    const bob1 = obliqueProjectCentered(drawBobX + 1, drawBobY);
-                    const bob2 = obliqueProjectCentered(drawBobX + 1, drawBobY + 1);
-                    const bob3 = obliqueProjectCentered(drawBobX, drawBobY + 1);
-                    const bobCenterX = (bob0.x + bob1.x + bob2.x + bob3.x) / 4;
-                    const bobCenterY = (bob0.y + bob1.y + bob2.y + bob3.y) / 4;
-                    const bobYOffset = -tileSize * 0.25 - 8; // Move Bob up 8px
-                    ctx.fillStyle = '#f66';
+                ctx.lineWidth = 1;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(bobCenterX - 10, bobCenterY + bobYOffset - 6, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(bobCenterX + 10, bobCenterY + bobYOffset - 6, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#222';
+                ctx.beginPath();
+                ctx.arc(bobCenterX - 10, bobCenterY + bobYOffset - 6, 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(bobCenterX + 10, bobCenterY + bobYOffset - 6, 2, 0, 2 * Math.PI);
+                ctx.fill();
+                if (bobSelected) {
+                    ctx.strokeStyle = '#33f';
+                    ctx.lineWidth = 4;
                     ctx.beginPath();
-                    ctx.arc(bobCenterX, bobCenterY + bobYOffset, 32, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.strokeStyle = '#a33';
-                    ctx.lineWidth = 6;
-                    ctx.beginPath();
-                    ctx.moveTo(bobCenterX - 12, bobCenterY + bobYOffset + 28);
-                    ctx.lineTo(bobCenterX - 12, bobCenterY + bobYOffset + 48);
-                    ctx.moveTo(bobCenterX + 12, bobCenterY + bobYOffset + 28);
-                    ctx.lineTo(bobCenterX + 12, bobCenterY + bobYOffset + 48);
+                    ctx.arc(bobCenterX, bobCenterY + bobYOffset, 38, 0, 2 * Math.PI);
                     ctx.stroke();
                     ctx.lineWidth = 1;
-                    ctx.fillStyle = '#fff';
-                    ctx.beginPath();
-                    ctx.arc(bobCenterX - 10, bobCenterY + bobYOffset - 6, 6, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(bobCenterX + 10, bobCenterY + bobYOffset - 6, 6, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.fillStyle = '#222';
-                    ctx.beginPath();
-                    ctx.arc(bobCenterX - 10, bobCenterY + bobYOffset - 6, 2, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(bobCenterX + 10, bobCenterY + bobYOffset - 6, 2, 0, 2 * Math.PI);
-                    ctx.fill();
-                    if (bobSelected) {
-                        ctx.strokeStyle = '#33f';
-                        ctx.lineWidth = 4;
-                        ctx.beginPath();
-                        ctx.arc(bobCenterX, bobCenterY + bobYOffset, 38, 0, 2 * Math.PI);
-                        ctx.stroke();
-                        ctx.lineWidth = 1;
-                    }
-                }
-
-                // Draw building if present (drawn after Bob)
-                const b = buildings[y][x];
-                if (b) {
-                    const center = obliqueProjectCentered(x + 0.5, y + 0.5);
-                    ctx.font = '32px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.globalAlpha = 0.95;
-                    ctx.fillText(b.icon, center.x, center.y); // Remove +8, move building up
-                    ctx.globalAlpha = 1.0;
                 }
             }
         }
-        ctx.restore();
-
-        // Draw resource bar along the bottom edge of the canvas
-        ctx.save();
-        ctx.font = 'bold 1.2rem sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillStyle = 'rgba(244,244,244,0.95)';
-        ctx.strokeStyle = '#ccc';
-        ctx.lineWidth = 2;
-        if (ctx.roundRect) {
-            ctx.beginPath();
-            ctx.roundRect(20, CANVAS_HEIGHT - 44, CANVAS_WIDTH - 40, 36, 10);
-            ctx.fill();
-            ctx.stroke();
-        } else {
-            ctx.fillRect(20, CANVAS_HEIGHT - 44, CANVAS_WIDTH - 40, 36);
-            ctx.strokeRect(20, CANVAS_HEIGHT - 44, CANVAS_WIDTH - 40, 36);
-        }
-        ctx.fillStyle = '#333';
-        const labels = [
-            `👥 POP: ${resources.pop}`,
-            `💰 GLD: ${resources.gld}`,
-            `🍔 FUD: ${resources.fud}`,
-            `😊 HPY: ${resources.hpy}`,
-            `📜 WIS: ${resources.wis}`
-        ];
-        const n = labels.length;
-        for (let i = 0; i < n; ++i) {
-            ctx.fillText(labels[i], 100 + i * ((CANVAS_WIDTH - 200) / (n - 1)), CANVAS_HEIGHT - 16);
-        }
-        ctx.restore();
-        requestAnimationFrame(draw);
     }
+    ctx.restore();
+
+    requestAnimationFrame(draw);
+}
 
 draw();
 
+// Start the kick drum and Bob's AI
+SoundEffects.startKickDrum();
+setTimeout(startBobAI, 1000);
 
 // --- Interactivity ---
 canvas.addEventListener('click', function (e) {
@@ -551,7 +507,8 @@ canvas.addEventListener('click', function (e) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (let y = 0; y < boardRows; y++) {
         for (let x = 0; x < boardCols; x++) {
-            if ((x === Math.round(drawBobX) && y !== Math.round(drawBobY)) || (y === Math.round(drawBobY) && x !== Math.round(drawBobX))) {
+            // Only consider existing tiles that are in the same row or column as Bob
+            if (boardTiles[y][x] && ((x === Math.round(drawBobX) && y !== Math.round(drawBobY)) || (y === Math.round(drawBobY) && x !== Math.round(drawBobX)))) {
                 const proj = obliqueProjectCentered(x + 0.5, y + 0.5);
                 minX = Math.min(minX, proj.x);
                 minY = Math.min(minY, proj.y);
@@ -592,126 +549,29 @@ canvas.addEventListener('click', function (e) {
         return ((b1 === b2) && (b2 === b3) && (b3 === b4));
     }
 
-    // If a building is selected, allow placement on gold-highlighted (adjacent) tiles
-    // Only restrict to one build per turn if not in Free Building mode
-    if (selectedBuilding && (!turnHasBuilt || freeBuild)) {
-        let triedToBuild = false;
-        let built = false;
-        for (let y = 0; y < boardRows; y++) {
-            for (let x = 0; x < boardCols; x++) {
-                const isAdjacent = (Math.abs(x - bobPos.x) + Math.abs(y - bobPos.y) === 1);
-                const canBuildHere = freeBuild ? (!buildings[y][x] && !(bobPos.x === x && bobPos.y === y)) : (isAdjacent && !buildings[y][x] && !(bobPos.x === x && bobPos.y === y));
-                if (pointInTile(x, y, mx, my)) {
-                    triedToBuild = true;
-                    if (canBuildHere) {
-                        // Subtract gold if not in Free Building mode
-                        if (!freeBuild) {
-                            if (resources.gld < selectedBuilding.price) {
-                                // Not enough gold, do nothing
-                                return;
-                            }
-                            resources.gld -= selectedBuilding.price;
-                            updateResourceDisplay();
-                        }
-                        buildings[y][x] = selectedBuilding;
-                        // Play sound effect for building type
-                        switch (selectedBuilding.id) {
-                            case 'house': SoundEffects.playHouse(); break;
-                            case 'tree': SoundEffects.playTree(); break;
-                            case 'well': SoundEffects.playWell(); break;
-                            case 'windmill': SoundEffects.playWindmill(); break;
-                            case 'farm': SoundEffects.playFarm(); break;
-                            case 'castle': SoundEffects.playCastle(); break;
-                            case 'shop': SoundEffects.playShop(); break;
-                            case 'factory': SoundEffects.playFactory(); break;
-                            case 'lighthouse': SoundEffects.playLighthouse(); break;
-                            case 'hotspring': SoundEffects.playHotspring(); break;
-                            case 'library': SoundEffects.playLibrary(); break;
-                            case 'portal': SoundEffects.playPortal(); break;
-                            case 'volcano': SoundEffects.playVolcano(); break;
-                            case 'aquarium': SoundEffects.playAquarium(); break;
-                            case 'zengarden': SoundEffects.playZengarden(); break;
-                            case 'ferriswheel': SoundEffects.playFerriswheel(); break;
-                            case 'hauntedhouse': SoundEffects.playHauntedhouse(); break;
-                        }
-                        // Enact resource effect only if not a per-turn effect
-                        if (selectedBuilding.resourceEffect && !/\/t$/.test(selectedBuilding.resourceEffect)) {
-                            // Support multiple effects separated by ';', only apply non-per-turn effects
-                            const effects = selectedBuilding.resourceEffect.split(';');
-                            let applied = false;
-                            effects.forEach(eff => {
-                                if (!/\/t$/.test(eff.trim())) {
-                                    const match = eff.match(/(POP|GLD|FUD|HPY|WIS)([+-]\d+)/i);
-                                    if (match) {
-                                        const key = match[1].toLowerCase();
-                                        const delta = parseInt(match[2], 10);
-                                        if (resources.hasOwnProperty(key)) {
-                                            resources[key] += delta;
-                                            applied = true;
-                                        }
-                                    }
-                                }
-                            });
-                            if (applied) updateResourceDisplay();
-                        }
-                        // If resourceEffect contains any ";", the above block is skipped due to the old logic's !/\/t$/.test(selectedBuilding.resourceEffect) check. To fix, always check all effects for non-per-turn effects:
-                        else if (selectedBuilding.resourceEffect && selectedBuilding.resourceEffect.includes(';')) {
-                            const effects = selectedBuilding.resourceEffect.split(';');
-                            let applied = false;
-                            effects.forEach(eff => {
-                                if (!/\/t$/.test(eff.trim())) {
-                                    const match = eff.match(/(POP|GLD|FUD|HPY|WIS)([+-]\d+)/i);
-                                    if (match) {
-                                        const key = match[1].toLowerCase();
-                                        const delta = parseInt(match[2], 10);
-                                        if (resources.hasOwnProperty(key)) {
-                                            resources[key] += delta;
-                                            applied = true;
-                                        }
-                                    }
-                                }
-                            });
-                            if (applied) updateResourceDisplay();
-                        }
-                        if (!freeBuild) {
-                            setSelectedBuilding(null);
-                            turnHasBuilt = true;
-                            disableBuildingBar();
-                            // Deselect all building bar buttons
-                            const bar = document.getElementById('building-bar');
-                            if (bar) {
-                                Array.from(bar.children).forEach(el => el.classList.remove('selected'));
-                            }
-                        }
-                        draw();
-                        built = true;
-                        return;
-                    }
-                }
-            }
-        }
-        if (triedToBuild && !built) {
-            showAnimatedText("Can't Build There", { color: '#e44', fontSize: '2.1rem' });
-        }
-    }
-
-    // Otherwise, handle Bob selection/movement (only if not already moved this turn)
-    if (!bobSelected && !turnHasMoved) {
+    // Handle Bob selection/movement
+    if (!bobSelected) {
         if (pointInTile(bobPos.x, bobPos.y, mx, my)) {
             bobSelected = true;
             draw();
         }
-    } else if (bobSelected) {
+    } else {
         let moved = false;
         for (let y = 0; y < boardRows; y++) {
             for (let x = 0; x < boardCols; x++) {
-                if ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x)) {
+                // Only consider existing tiles that are in the same row or column as Bob
+                if (boardTiles[y][x] && ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x))) {
                     if (pointInTile(x, y, mx, my)) {
+                        // Calculate distance for proportional movement speed
+                        const distance = Math.abs(x - bobPos.x) + Math.abs(y - bobPos.y);
+                        const baseDuration = 200; // Base duration per tile
+                        const duration = baseDuration * distance;
+                        
                         bobAnim = {
                             from: { ...bobPos },
                             to: { x, y },
                             start: performance.now(),
-                            duration: 300
+                            duration: duration
                         };
                         bobPos = { x, y };
                         moved = true;
@@ -722,130 +582,6 @@ canvas.addEventListener('click', function (e) {
             if (moved) break;
         }
         bobSelected = false;
-        if (moved) turnHasMoved = true;
         draw();
     }
 });
-
-// --- Building bar UI ---
-const bar = document.getElementById('building-bar');
-if (bar) {
-    bar.innerHTML = "";
-    buildingTypes.forEach((b, i) => {
-        const btn = document.createElement('button');
-        // Make the card wider for effect line
-    btn.style.minWidth = '172px';
-    btn.style.maxWidth = '260px';
-    btn.style.whiteSpace = 'normal';
-        const isLongName = b.name.length > 12;
-        // Support multiple effects separated by ';' and show on one line
-        let effectHtml = '';
-        if (b.resourceEffect) {
-            const effects = b.resourceEffect.split(';');
-            // Dynamically shrink font size if effects are long
-            let totalLen = effects.reduce((sum, eff) => sum + eff.length, 0);
-            let fontSize = '1.08em';
-            if (totalLen > 16) fontSize = '0.98em';
-            if (totalLen > 22) fontSize = '0.89em';
-            // Emoji map
-            const emojiMap = {
-                POP: '👥',
-                GLD: '💰',
-                FUD: '🍔',
-                HPY: '😊',
-                WIS: '📜'
-            };
-            effectHtml = `<div style="display:flex;gap:8px;align-items:center;justify-content:center;margin:2px 0 2px 0;flex-wrap:nowrap;">` +
-                effects.map(eff => {
-                    // Replace resource label with emoji
-                    let effEmoji = eff.replace(/(POP|GLD|FUD|HPY|WIS)/g, m => emojiMap[m] || m);
-                    const isPerTurn = /\/t$/.test(eff);
-                    const isNegative = /-[0-9]/.test(eff);
-                    const isPositive = /\+[0-9]/.test(eff);
-                    let color = '#b88';
-                    if (isNegative) color = '#d22';
-                    else if (isPositive && isPerTurn) color = '#3bb34a'; // lighter green for per-turn positive
-                    else if (isPositive) color = '#188c2c'; // darker green for on-placement positive
-                    else if (isPerTurn) color = '#2a2';
-                    return `<span class=\"resource-effect\" style=\"color:${color};font-size:${fontSize};white-space:nowrap;\">${effEmoji}</span>`;
-                }).join('') + `</div>`;
-        }
-        btn.innerHTML = `
-            <span class=\"label\" style=\"display:block;font-size:${isLongName ? '0.98em' : '1.12em'};line-height:${isLongName ? '1.05' : '1.18'};font-weight:bold;\">${b.name}</span>
-            <span class=\"icon\">${b.icon}</span>
-            ${effectHtml}
-            <span class=\"desc\">${b.desc ? b.desc : ''}</span>
-            <div class=\"price\" style=\"margin-top:6px;font-weight:bold;color:#b88;font-size:1.1em;display:flex;align-items:center;justify-content:center;gap:2px;\">
-                <span style=\"font-size:1.2em;vertical-align:middle;\">💰</span> ${b.price}
-            </div>
-        `;
-        // Disable and grey out if not enough gold and not in Free Building mode
-        if (!freeBuild && b.price > resources.gld) {
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            btn.style.pointerEvents = 'none';
-        }
-        btn.addEventListener('click', () => {
-            if (turnHasBuilt && !freeBuild) return; // Disable if already built this turn, unless freeBuild
-            // If already selected, de-select
-            if (selectedBuilding === b) {
-                setSelectedBuilding(null);
-                Array.from(bar.children).forEach(el => el.classList.remove('selected'));
-                return;
-            }
-            setSelectedBuilding(b);
-            // Highlight selected
-            Array.from(bar.children).forEach((el, idx) => {
-                if (idx === i) {
-                    el.classList.add('selected');
-                } else {
-                    el.classList.remove('selected');
-                }
-            });
-        });
-        bar.appendChild(btn);
-    });
-}
-
-// --- Free Building UI ---
-// freeBuild is now imported from gameState.js
-let freeBuildCheckbox = document.getElementById('free-build-checkbox');
-if (!freeBuildCheckbox) {
-    freeBuildCheckbox = document.createElement('input');
-    freeBuildCheckbox.type = 'checkbox';
-    freeBuildCheckbox.id = 'free-build-checkbox';
-    freeBuildCheckbox.style.marginLeft = '18px';
-    freeBuildCheckbox.style.marginTop = '12px';
-    freeBuildCheckbox.style.transform = 'scale(1.2)';
-}
-let freeBuildLabel = document.getElementById('free-build-label');
-if (!freeBuildLabel) {
-    freeBuildLabel = document.createElement('label');
-    freeBuildLabel.htmlFor = 'free-build-checkbox';
-    freeBuildLabel.id = 'free-build-label';
-    freeBuildLabel.textContent = ' Free Building';
-    freeBuildLabel.style.fontSize = '1.08rem';
-    freeBuildLabel.style.color = '#333';
-    freeBuildLabel.style.marginLeft = '4px';
-}
-// Place under background options
-const bgBar = document.getElementById('background-bar') || document.getElementById('level-select')?.parentElement;
-if (bgBar && !document.getElementById('free-build-checkbox')) {
-    const container = document.createElement('div');
-    container.style.display = 'flex';
-    container.style.alignItems = 'center';
-    container.style.justifyContent = 'center';
-    container.style.marginTop = '10px';
-    container.appendChild(freeBuildCheckbox);
-    container.appendChild(freeBuildLabel);
-    bgBar.parentElement.appendChild(container);
-}
-freeBuildCheckbox.onchange = () => {
-    freeBuild = freeBuildCheckbox.checked;
-    enableBuildingBar();
-};
-
-
-
-
-

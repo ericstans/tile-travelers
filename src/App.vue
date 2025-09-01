@@ -1,8 +1,6 @@
 <template>
   <div id="app">
     <CanvasArea />
-    <BuildingBar />
-    <LevelBar />
     <BackgroundModeBar />
     <link rel="stylesheet" href="../src/background-mode-bar.css">
   </div>
@@ -10,16 +8,12 @@
 
 <script>
 import CanvasArea from './components/CanvasArea.vue';
-import BuildingBar from './components/BuildingBar.vue';
-import LevelBar from './components/LevelBar.vue';
 import BackgroundModeBar from './components/BackgroundModeBar.vue';
 
 export default {
   name: 'App',
   components: {
     CanvasArea,
-    BuildingBar,
-    LevelBar,
     BackgroundModeBar
   },
   mounted() {
