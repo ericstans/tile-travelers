@@ -1,7 +1,7 @@
 {
-  "name": "Vue template",
+  "name": "Tile travelers",
   "version": "1.0.0",
-  "description": "Template for quickly starting Vue.js projects targeting Github Pages.",
+  "description": "Little dudes walk around on a board, hit the tiles with their feet and make music.",
   "main": "src/index.js",
   "scripts": {
   "start": "webpack serve --mode development --open",
