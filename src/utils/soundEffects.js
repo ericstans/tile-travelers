@@ -82,14 +82,14 @@ const SoundEffects = (() => {
     }
     
     function getNextBeatTime() {
-        const now = Date.now();
+        const now = performance.now();
         const timeSinceStart = now % BEAT_DURATION_MS;
         const timeToNextBeat = BEAT_DURATION_MS - timeSinceStart;
         return timeToNextBeat;
     }
     
     function getNextEighthNoteTime() {
-        const now = Date.now();
+        const now = performance.now();
         const timeSinceStart = now % EIGHTH_NOTE_MS;
         const timeToNextEighth = EIGHTH_NOTE_MS - timeSinceStart;
         return timeToNextEighth;
@@ -275,7 +275,7 @@ const SoundEffects = (() => {
                 const shakerBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
                 const shakerData = shakerBuffer.getChannelData(0);
                 for (let i = 0; i < shakerData.length; i++) {
-                    const t = i / ctx.sampleRate;
+            const t = i / ctx.sampleRate;
                     // Create multiple frequency components for realistic shaker sound
                     const noise = (Math.random() * 2 - 1) * 0.3;
                     const envelope = Math.exp(-t * 8); // Quick decay

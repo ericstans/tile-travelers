@@ -24,8 +24,8 @@ const objectActivation = Array.from({ length: boardRows }, () => Array(boardCols
 const objectActivationTime = Array.from({ length: boardRows }, () => Array(boardCols).fill(0));
 
 // Populate tiles with random objects
-for (let y = 0; y < boardRows; y++) {
-    for (let x = 0; x < boardCols; x++) {
+    for (let y = 0; y < boardRows; y++) {
+        for (let x = 0; x < boardCols; x++) {
         // Only place objects on existing tiles
         if (boardTiles[y][x] && Math.random() < TILE_OBJECT_PROBABILITY) {
             const objectTypes = Object.keys(OBJECT_TYPES);
@@ -417,11 +417,11 @@ function moveCharacterToNext(charId) {
     const distance = Math.abs(nextPos.x - state.pos.x) + Math.abs(nextPos.y - state.pos.y);
     
     // Calculate timing to sync movement with beat
-    const currentTime = Date.now();
+    const currentTime = performance.now();
     const delayToNextBeat = SoundEffects.getTimeToNextBeatFromTime(currentTime);
     
     // Start movement animation to complete on the next beat
-    const movementStartTime = Date.now();
+    const movementStartTime = performance.now();
     const movementDuration = delayToNextBeat;
     
     state.anim = {
@@ -434,7 +434,7 @@ function moveCharacterToNext(charId) {
     // Play footstep exactly when movement completes (on the beat)
     // Use a more precise timing approach
     const footstepTime = currentTime + delayToNextBeat;
-    const footstepDelay = footstepTime - Date.now();
+    const footstepDelay = footstepTime - performance.now();
     
     setTimeout(() => {
         SoundEffects.playFootstep(charId, char);
@@ -447,7 +447,7 @@ function moveCharacterToNext(charId) {
         
         // Schedule next move to start on the next eighth note
         const nextMoveTime = footstepTime + SoundEffects.EIGHTH_NOTE_MS;
-        const nextMoveDelay = nextMoveTime - Date.now();
+        const nextMoveDelay = nextMoveTime - performance.now();
         setTimeout(() => moveCharacterToNext(charId), Math.max(0, nextMoveDelay));
     }, Math.max(0, footstepDelay));
 }
@@ -466,14 +466,13 @@ function moveCharacterToNext(charId) {
          let drawY = state.pos.y;
          
          if (state.anim) {
-             const currentTime = Date.now();
-             const elapsed = Math.min(currentTime - state.anim.start, state.anim.duration);
+             const elapsed = Math.min(time - state.anim.start, state.anim.duration);
              const t = Math.min(1, elapsed / state.anim.duration);
-            // Smoother easing function to reduce jerks
-            const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // Ease-in-out
+            // Ease out cubic for snappy feel
+            const ease = 1 - Math.pow(1 - t, 3);
              drawX = state.anim.from.x + (state.anim.to.x - state.anim.from.x) * ease;
              drawY = state.anim.from.y + (state.anim.to.y - state.anim.from.y) * ease;
-             // Clean up animation when complete
+             // Footsteps are now played when reaching squares, not during animation
             if (t >= 1) {
                  state.anim = null;
              }
@@ -487,7 +486,7 @@ function moveCharacterToNext(charId) {
      ctx.translate(cameraOffsetX, cameraOffsetY);
      ctx.scale(cameraZoom, cameraZoom);
 
-        // Draw the board as a grid of parallelogram tiles (FIRST PASS - TILES ONLY)
+        // Draw the board as a grid of parallelogram tiles
         for (let y = 0; y < boardRows; y++) {
             for (let x = 0; x < boardCols; x++) {
             // Only draw tiles that exist
@@ -504,6 +503,7 @@ function moveCharacterToNext(charId) {
                 ctx.lineTo(p2.x, p2.y);
                 ctx.lineTo(p3.x, p3.y);
                 ctx.closePath();
+                         // No more rook move highlighting since Bob is not interactive
             
                          // Highlight target squares for all characters
              let isAnyTarget = false;
@@ -517,15 +517,19 @@ function moveCharacterToNext(charId) {
                 }
              });
             
-                             ctx.strokeStyle = '#333';
-             ctx.stroke();
-             ctx.fillStyle = (x + y) % 2 === 0 ? '#eaeaea' : '#d0d0d0';
+                ctx.strokeStyle = '#333';
+                ctx.stroke();
+                ctx.fillStyle = (x + y) % 2 === 0 ? '#eaeaea' : '#d0d0d0';
              if (!isAnyTarget) ctx.fill();
 
              // Draw tile object (behind characters)
              const objectType = tileObjects[y][x];
              if (objectType) {
                  const object = OBJECT_TYPES[objectType];
+                 const p0 = obliqueProjectCentered(x, y);
+                 const p1 = obliqueProjectCentered(x + 1, y);
+                 const p2 = obliqueProjectCentered(x + 1, y + 1);
+                 const p3 = obliqueProjectCentered(x, y + 1);
                  const centerX = (p0.x + p1.x + p2.x + p3.x) / 4;
                  const centerY = (p0.y + p1.y + p2.y + p3.y) / 4;
                  
@@ -547,58 +551,59 @@ function moveCharacterToNext(charId) {
                  // Reset shadow
                  ctx.shadowBlur = 0;
              }
+
+             // Draw all characters if they're on this tile
+             Object.keys(CHARACTERS).forEach(charId => {
+                 const char = CHARACTERS[charId];
+                 const drawPos = characterDrawPositions[charId];
+                 
+                 if (Math.round(drawPos.x) === x && Math.round(drawPos.y) === y) {
+                     const char0 = obliqueProjectCentered(drawPos.x, drawPos.y);
+                     const char1 = obliqueProjectCentered(drawPos.x + 1, drawPos.y);
+                     const char2 = obliqueProjectCentered(drawPos.x + 1, drawPos.y + 1);
+                     const char3 = obliqueProjectCentered(drawPos.x, drawPos.y + 1);
+                     const charCenterX = (char0.x + char1.x + char2.x + char3.x) / 4;
+                     const charCenterY = (char0.y + char1.y + char2.y + char3.y) / 4;
+                     const charYOffset = -tileSize * 0.25 - 8; // Move character up 8px
+                     
+                     // Draw character body
+                     ctx.fillStyle = char.color;
+                    ctx.beginPath();
+                     ctx.arc(charCenterX, charCenterY + charYOffset, 32, 0, 2 * Math.PI);
+                    ctx.fill();
+                     
+                     // Draw character legs
+                     ctx.strokeStyle = char.outlineColor;
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                     ctx.moveTo(charCenterX - 12, charCenterY + charYOffset + 28);
+                     ctx.lineTo(charCenterX - 12, charCenterY + charYOffset + 48);
+                     ctx.moveTo(charCenterX + 12, charCenterY + charYOffset + 28);
+                     ctx.lineTo(charCenterX + 12, charCenterY + charYOffset + 48);
+                    ctx.stroke();
+                     
+                     // Draw character eyes
+                    ctx.lineWidth = 1;
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                     ctx.arc(charCenterX - 10, charCenterY + charYOffset - 6, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.beginPath();
+                     ctx.arc(charCenterX + 10, charCenterY + charYOffset - 6, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                     
+                     // Draw character pupils
+                    ctx.fillStyle = '#222';
+                    ctx.beginPath();
+                     ctx.arc(charCenterX - 10, charCenterY + charYOffset - 6, 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.beginPath();
+                     ctx.arc(charCenterX + 10, charCenterY + charYOffset - 6, 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                 }
+             });
             }
         }
-
-        // SECOND PASS - DRAW ALL CHARACTERS ON TOP OF TILES
-        Object.keys(CHARACTERS).forEach(charId => {
-            const char = CHARACTERS[charId];
-            const drawPos = characterDrawPositions[charId];
-            
-            // Calculate character position
-            const char0 = obliqueProjectCentered(drawPos.x, drawPos.y);
-            const char1 = obliqueProjectCentered(drawPos.x + 1, drawPos.y);
-            const char2 = obliqueProjectCentered(drawPos.x + 1, drawPos.y + 1);
-            const char3 = obliqueProjectCentered(drawPos.x, drawPos.y + 1);
-            const charCenterX = (char0.x + char1.x + char2.x + char3.x) / 4;
-            const charCenterY = (char0.y + char1.y + char2.y + char3.y) / 4;
-            const charYOffset = -tileSize * 0.2; // Reduced offset for better tile alignment
-            
-            // Draw character body
-            ctx.fillStyle = char.color;
-            ctx.beginPath();
-            ctx.arc(charCenterX, charCenterY + charYOffset, 32, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // Draw character legs
-            ctx.strokeStyle = char.outlineColor;
-            ctx.lineWidth = 6;
-            ctx.beginPath();
-            ctx.moveTo(charCenterX - 12, charCenterY + charYOffset + 28);
-            ctx.lineTo(charCenterX - 12, charCenterY + charYOffset + 48);
-            ctx.moveTo(charCenterX + 12, charCenterY + charYOffset + 28);
-            ctx.lineTo(charCenterX + 12, charCenterY + charYOffset + 48);
-            ctx.stroke();
-            
-            // Draw character eyes
-            ctx.lineWidth = 1;
-            ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.arc(charCenterX - 10, charCenterY + charYOffset - 6, 6, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(charCenterX + 10, charCenterY + charYOffset - 6, 6, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // Draw character pupils
-            ctx.fillStyle = '#222';
-            ctx.beginPath();
-            ctx.arc(charCenterX - 10, charCenterY + charYOffset - 6, 2, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(charCenterX + 10, charCenterY + charYOffset - 6, 2, 0, 2 * Math.PI);
-            ctx.fill();
-        });
         ctx.restore();
 
         requestAnimationFrame(draw);
