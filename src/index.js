@@ -105,7 +105,6 @@ function obliqueProjectCentered(x, y) {
 
 // --- Bob's state ---
 let bobPos = { x: 2, y: 2 };
-let bobSelected = false;
 let bobAnim = null; // {from: {x,y}, to: {x,y}, start: time, duration: ms}
 
 // --- Bob AI state ---
@@ -179,74 +178,27 @@ function findPathVertical(start, target) {
 }
 
 function chooseRandomTarget() {
-    // Find Bob's current projected position for camera calculations
-    const bobProj = obliqueProjectCentered(bobPos.x + 0.5, bobPos.y + 0.5);
-    
-    // Calculate camera offset (same logic as in draw function)
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (let y = 0; y < boardRows; y++) {
-        for (let x = 0; x < boardCols; x++) {
-            if (boardTiles[y][x] && ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x))) {
-                const proj = obliqueProjectCentered(x + 0.5, y + 0.5);
-                minX = Math.min(minX, proj.x);
-                minY = Math.min(minY, proj.y);
-                maxX = Math.max(maxX, proj.x);
-                maxY = Math.max(maxY, proj.y);
-            }
-        }
-    }
-    
-    let needsScroll = false;
-    if (minX < 0 || maxX > CANVAS_WIDTH || minY < 0 || maxY > CANVAS_HEIGHT) {
-        needsScroll = true;
-    }
-    
-    let camOffsetX = 0, camOffsetY = 0;
-    if (needsScroll) {
-        const targetX = CANVAS_WIDTH / 2;
-        const targetY = CANVAS_HEIGHT / 2;
-        camOffsetX = targetX - bobProj.x;
-        camOffsetY = targetY - bobProj.y;
-    }
-    
-    // Find all reachable tiles, separating on-screen and off-screen
-    const onScreenTiles = [];
-    const offScreenTiles = [];
+    // Find all reachable tiles
+    const reachableTiles = [];
     
     for (let y = 0; y < boardRows; y++) {
         for (let x = 0; x < boardCols; x++) {
             if (boardTiles[y][x] && (x !== bobPos.x || y !== bobPos.y)) {
-                // Check if this tile is reachable via rook movement
                 const path = findPath(bobPos, { x, y });
                 if (path && path.length > 0) {
-                    // Check if tile is on-screen or off-screen
-                    const tileProj = obliqueProjectCentered(x + 0.5, y + 0.5);
-                    const screenX = tileProj.x + camOffsetX;
-                    const screenY = tileProj.y + camOffsetY;
-                    
-                    const isOnScreen = screenX >= 0 && screenX <= CANVAS_WIDTH && 
-                                     screenY >= 0 && screenY <= CANVAS_HEIGHT;
-                    
-                    if (isOnScreen) {
-                        onScreenTiles.push({ x, y });
-                    } else {
-                        offScreenTiles.push({ x, y });
-                    }
+                    reachableTiles.push({ x, y });
                 }
             }
         }
     }
     
-    // Prefer off-screen tiles, fall back to on-screen if none available
-    const targetTiles = offScreenTiles.length > 0 ? offScreenTiles : onScreenTiles;
-    
-    if (targetTiles.length === 0) {
+    if (reachableTiles.length === 0) {
         return null; // No reachable targets
     }
     
-    // Choose a random tile from the preferred set
-    const randomIndex = Math.floor(Math.random() * targetTiles.length);
-    return targetTiles[randomIndex];
+    // Choose a random reachable tile
+    const randomIndex = Math.floor(Math.random() * reachableTiles.length);
+    return reachableTiles[randomIndex];
 }
 
 function startBobAI() {
@@ -358,38 +310,19 @@ function draw(time = performance.now()) {
         }
     }
 
-    // --- Camera scroll logic ---
-    // Find Bob's projected center
-    const bobProj = obliqueProjectCentered(drawBobX + 0.5, drawBobY + 0.5);
-    // Find all navigable squares from Bob's position (rook moves)
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (let y = 0; y < boardRows; y++) {
-        for (let x = 0; x < boardCols; x++) {
-            // Only consider existing tiles that are in the same row or column as Bob
-            if (boardTiles[y][x] && ((x === Math.round(drawBobX) && y !== Math.round(drawBobY)) || (y === Math.round(drawBobY) && x !== Math.round(drawBobX)))) {
-                const proj = obliqueProjectCentered(x + 0.5, y + 0.5);
-                minX = Math.min(minX, proj.x);
-                minY = Math.min(minY, proj.y);
-                maxX = Math.max(maxX, proj.x);
-                maxY = Math.max(maxY, proj.y);
-            }
-        }
-    }
-    // Check if any navigable square is outside the canvas
-    let needsScroll = false;
-    if (minX < 0 || maxX > CANVAS_WIDTH || minY < 0 || maxY > CANVAS_HEIGHT) {
-        needsScroll = true;
-    }
-    let camOffsetX = 0, camOffsetY = 0;
-    if (needsScroll) {
-        // Target center (canvas center)
-        const targetX = CANVAS_WIDTH / 2;
-        const targetY = CANVAS_HEIGHT / 2;
-        camOffsetX = targetX - bobProj.x;
-        camOffsetY = targetY - bobProj.y;
-    }
-    ctx.save();
-    ctx.translate(camOffsetX, camOffsetY);
+         // --- Fixed camera centered on board ---
+     // Calculate board center offset to center the entire board on canvas
+     const boardCenterX = boardCols / 2;
+     const boardCenterY = boardRows / 2;
+     const boardCenterProj = obliqueProjectCentered(boardCenterX, boardCenterY);
+     const canvasCenterX = CANVAS_WIDTH / 2;
+     const canvasCenterY = CANVAS_HEIGHT / 2;
+     
+     const camOffsetX = canvasCenterX - boardCenterProj.x;
+     const camOffsetY = canvasCenterY - boardCenterProj.y;
+     
+     ctx.save();
+     ctx.translate(camOffsetX, camOffsetY);
 
     // Draw the board as a grid of parallelogram tiles
     for (let y = 0; y < boardRows; y++) {
@@ -408,13 +341,7 @@ function draw(time = performance.now()) {
             ctx.lineTo(p2.x, p2.y);
             ctx.lineTo(p3.x, p3.y);
             ctx.closePath();
-            // Highlight valid rook moves if Bob is selected
-            let isRookMove = false;
-            if (bobSelected && ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x))) {
-                isRookMove = true;
-                ctx.fillStyle = 'rgba(100,200,255,0.35)';
-                ctx.fill();
-            }
+                         // No more rook move highlighting since Bob is not interactive
             
             // Highlight target square in red
             let isTarget = false;
@@ -424,10 +351,10 @@ function draw(time = performance.now()) {
                 ctx.fill();
             }
             
-            ctx.strokeStyle = '#333';
-            ctx.stroke();
-            ctx.fillStyle = (x + y) % 2 === 0 ? '#eaeaea' : '#d0d0d0';
-            if (!isRookMove && !isTarget) ctx.fill();
+                         ctx.strokeStyle = '#333';
+             ctx.stroke();
+             ctx.fillStyle = (x + y) % 2 === 0 ? '#eaeaea' : '#d0d0d0';
+             if (!isTarget) ctx.fill();
 
             // Draw Bob if he's on this tile (rounded to nearest int for animation)
             if (Math.round(drawBobX) === x && Math.round(drawBobY) === y) {
@@ -462,17 +389,9 @@ function draw(time = performance.now()) {
                 ctx.beginPath();
                 ctx.arc(bobCenterX - 10, bobCenterY + bobYOffset - 6, 2, 0, 2 * Math.PI);
                 ctx.fill();
-                ctx.beginPath();
-                ctx.arc(bobCenterX + 10, bobCenterY + bobYOffset - 6, 2, 0, 2 * Math.PI);
-                ctx.fill();
-                if (bobSelected) {
-                    ctx.strokeStyle = '#33f';
-                    ctx.lineWidth = 4;
-                    ctx.beginPath();
-                    ctx.arc(bobCenterX, bobCenterY + bobYOffset, 38, 0, 2 * Math.PI);
-                    ctx.stroke();
-                    ctx.lineWidth = 1;
-                }
+                                 ctx.beginPath();
+                 ctx.arc(bobCenterX + 10, bobCenterY + bobYOffset - 6, 2, 0, 2 * Math.PI);
+                 ctx.fill();
             }
         }
     }
@@ -487,101 +406,4 @@ draw();
 SoundEffects.startKickDrum();
 setTimeout(startBobAI, 1000);
 
-// --- Interactivity ---
-canvas.addEventListener('click', function (e) {
-    const rect = canvas.getBoundingClientRect();
-    let mx = e.clientX - rect.left;
-    let my = e.clientY - rect.top;
-
-    // Camera offset logic (must match draw)
-    let drawBobX = bobPos.x;
-    let drawBobY = bobPos.y;
-    if (bobAnim) {
-        const elapsed = Math.min(performance.now() - bobAnim.start, bobAnim.duration);
-        const t = Math.min(1, elapsed / bobAnim.duration);
-        const ease = 1 - Math.pow(1 - t, 3);
-        drawBobX = bobAnim.from.x + (bobAnim.to.x - bobAnim.from.x) * ease;
-        drawBobY = bobAnim.from.y + (bobAnim.to.y - bobAnim.from.y) * ease;
-    }
-    // Find all navigable squares from Bob's position (rook moves)
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (let y = 0; y < boardRows; y++) {
-        for (let x = 0; x < boardCols; x++) {
-            // Only consider existing tiles that are in the same row or column as Bob
-            if (boardTiles[y][x] && ((x === Math.round(drawBobX) && y !== Math.round(drawBobY)) || (y === Math.round(drawBobY) && x !== Math.round(drawBobX)))) {
-                const proj = obliqueProjectCentered(x + 0.5, y + 0.5);
-                minX = Math.min(minX, proj.x);
-                minY = Math.min(minY, proj.y);
-                maxX = Math.max(maxX, proj.x);
-                maxY = Math.max(maxY, proj.y);
-            }
-        }
-    }
-    // Check if any navigable square is outside the canvas
-    let needsScroll = false;
-    if (minX < 0 || maxX > CANVAS_WIDTH || minY < 0 || maxY > CANVAS_HEIGHT) {
-        needsScroll = true;
-    }
-    let camOffsetX = 0, camOffsetY = 0;
-    if (needsScroll) {
-        const bobProj = obliqueProjectCentered(drawBobX + 0.5, drawBobY + 0.5);
-        const targetX = CANVAS_WIDTH / 2;
-        const targetY = CANVAS_HEIGHT / 2;
-        camOffsetX = targetX - bobProj.x;
-        camOffsetY = targetY - bobProj.y;
-    }
-    // Adjust mouse coordinates for camera offset
-    mx -= camOffsetX;
-    my -= camOffsetY;
-
-    function pointInTile(x, y, px, py) {
-        const p0 = obliqueProjectCentered(x, y);
-        const p1 = obliqueProjectCentered(x + 1, y);
-        const p2 = obliqueProjectCentered(x + 1, y + 1);
-        const p3 = obliqueProjectCentered(x, y + 1);
-        function sign(ax, ay, bx, by, cx, cy) {
-            return (ax - cx) * (by - cy) - (bx - cx) * (ay - cy);
-        }
-        const b1 = sign(px, py, p0.x, p0.y, p1.x, p1.y) < 0;
-        const b2 = sign(px, py, p1.x, p1.y, p2.x, p2.y) < 0;
-        const b3 = sign(px, py, p2.x, p2.y, p3.x, p3.y) < 0;
-        const b4 = sign(px, py, p3.x, p3.y, p0.x, p0.y) < 0;
-        return ((b1 === b2) && (b2 === b3) && (b3 === b4));
-    }
-
-    // Handle Bob selection/movement
-    if (!bobSelected) {
-        if (pointInTile(bobPos.x, bobPos.y, mx, my)) {
-            bobSelected = true;
-            draw();
-        }
-    } else {
-        let moved = false;
-        for (let y = 0; y < boardRows; y++) {
-            for (let x = 0; x < boardCols; x++) {
-                // Only consider existing tiles that are in the same row or column as Bob
-                if (boardTiles[y][x] && ((x === bobPos.x && y !== bobPos.y) || (y === bobPos.y && x !== bobPos.x))) {
-                    if (pointInTile(x, y, mx, my)) {
-                        // Calculate distance for proportional movement speed
-                        const distance = Math.abs(x - bobPos.x) + Math.abs(y - bobPos.y);
-                        const baseDuration = 200; // Base duration per tile
-                        const duration = baseDuration * distance;
-                        
-                        bobAnim = {
-                            from: { ...bobPos },
-                            to: { x, y },
-                            start: performance.now(),
-                            duration: duration
-                        };
-                        bobPos = { x, y };
-                        moved = true;
-                        break;
-                    }
-                }
-            }
-            if (moved) break;
-        }
-        bobSelected = false;
-        draw();
-    }
-});
+// Bob is now fully autonomous - no mouse interaction
