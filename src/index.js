@@ -133,7 +133,7 @@ function makeGrassBuffer(bgType) {
     // --- Character System ---
 const CHARACTERS = {
     bob: {
-        name: 'Bob',
+        name: 'Bassline Bob',
         startPos: { x: 2, y: 2 },
         color: '#f66',
         outlineColor: '#a33',
@@ -144,7 +144,12 @@ const CHARACTERS = {
         waveType: 'sine',
         footstepFreq: { min: 470, max: 530 },
         footstepDuration: 0.06,
-        footstepVolume: 0.22
+        footstepVolume: 0.22,
+        // Bassline Bob specific properties
+        isBassline: true,
+        bassFreq: 55, // Low A note
+        bassVolume: 0.15,
+        noKickOnBlank: true
     },
     larry: {
         name: 'Larry',
@@ -161,7 +166,7 @@ const CHARACTERS = {
         footstepVolume: 0.18
     },
     charlie: {
-        name: 'Charlie',
+        name: 'Charlie Kicks',
         startPos: { x: 2, y: 18 },
         color: '#6f6',
         outlineColor: '#363',
@@ -172,7 +177,8 @@ const CHARACTERS = {
         waveType: 'sawtooth',
         footstepFreq: { min: 400, max: 450 },
         footstepDuration: 0.07,
-        footstepVolume: 0.20
+        footstepVolume: 0.20,
+        noKickOnBlank: true
     },
     diana: {
         name: 'Diana',
@@ -186,7 +192,10 @@ const CHARACTERS = {
         waveType: 'square',
         footstepFreq: { min: 380, max: 420 },
         footstepDuration: 0.065,
-        footstepVolume: 0.19
+        footstepVolume: 0.19,
+        // Diana moves at twice the speed (300 BPM equivalent)
+        speedMultiplier: 2.0,
+        noKickOnBlank: true
     }
 };
 
@@ -259,8 +268,9 @@ function activateObject(x, y, charId) {
             objectActivation[y][x] = false;
         }, 500);
     } else {
-        // Empty tile - play kick drum
-        if (shouldPlaySound('kick', currentTime)) {
+        // Empty tile - play kick drum (unless character has noKickOnBlank)
+        const char = CHARACTERS[charId];
+        if (!char.noKickOnBlank && shouldPlaySound('kick', currentTime)) {
             SoundEffects.playKickDrum();
         }
     }
@@ -328,6 +338,31 @@ function findPathVertical(start, target) {
     }
     
     return path;
+}
+
+function getRandomBassFrequency() {
+    // Collect all chord notes from non-bassline characters
+    const allChordNotes = [];
+    
+    Object.values(CHARACTERS).forEach(char => {
+        if (!char.isBassline) {
+            // Add notes from chordDesignated and chordReached
+            allChordNotes.push(...char.chordDesignated);
+            allChordNotes.push(...char.chordReached);
+        }
+    });
+    
+    if (allChordNotes.length === 0) {
+        return 55; // Fallback to low A if no chords available
+    }
+    
+    // Select a random note and transpose it down to bass range
+    const randomNote = allChordNotes[Math.floor(Math.random() * allChordNotes.length)];
+    
+    // Transpose down by 2-3 octaves to get into bass range (55-220 Hz)
+    const bassFreq = randomNote / 4; // Divide by 4 to go down 2 octaves
+    
+    return bassFreq;
 }
 
 function chooseRandomTarget(currentPos) {
@@ -400,7 +435,16 @@ function moveCharacterToNext(charId) {
         // Reached target - sync sound to next beat
         const delayToNextBeat = SoundEffects.getNextBeatTime();
         setTimeout(() => {
-            SoundEffects.playTargetReached(charId, char);
+            if (char.isBassline) {
+                // Bassline Bob: Stop current bass note and start new one when reaching target
+                SoundEffects.stopBassNote();
+                // Start new bass note with random frequency from other characters' chords
+                const randomFreq = getRandomBassFrequency();
+                SoundEffects.startBassNote(randomFreq, char.bassVolume);
+            } else {
+                // Other characters: Play target reached sound
+                SoundEffects.playTargetReached(charId, char);
+            }
         }, delayToNextBeat);
         
         state.moving = false;
@@ -420,9 +464,13 @@ function moveCharacterToNext(charId) {
     const currentTime = performance.now();
     const delayToNextBeat = SoundEffects.getTimeToNextBeatFromTime(currentTime);
     
-    // Start movement animation to complete on the next beat
+    // Apply speed multiplier for faster characters
+    const speedMultiplier = char.speedMultiplier || 1.0;
+    const adjustedDelay = delayToNextBeat / speedMultiplier;
+    
+    // Start movement animation to complete on the next beat (adjusted for speed)
     const movementStartTime = performance.now();
-    const movementDuration = delayToNextBeat;
+    const movementDuration = adjustedDelay;
     
     state.anim = {
         from: { ...state.pos },
@@ -431,13 +479,17 @@ function moveCharacterToNext(charId) {
         duration: movementDuration
     };
     
-    // Play footstep exactly when movement completes (on the beat)
+    // Play footstep exactly when movement completes (on the beat, adjusted for speed)
     // Use a more precise timing approach
-    const footstepTime = currentTime + delayToNextBeat;
+    const footstepTime = currentTime + adjustedDelay;
     const footstepDelay = footstepTime - performance.now();
     
     setTimeout(() => {
-        SoundEffects.playFootstep(charId, char);
+        // Only play footstep for non-bassline characters
+        if (!char.isBassline) {
+            SoundEffects.playFootstep(charId, char);
+        }
+        
         // Update character's position when footstep plays
         state.pos = { ...nextPos };
         state.pathIndex++;
@@ -445,8 +497,9 @@ function moveCharacterToNext(charId) {
         // Activate object if character stepped on one
         activateObject(nextPos.x, nextPos.y, charId);
         
-        // Schedule next move to start on the next eighth note
-        const nextMoveTime = footstepTime + SoundEffects.EIGHTH_NOTE_MS;
+        // Schedule next move to start on the next eighth note (adjusted for speed)
+        const eighthNoteDelay = SoundEffects.EIGHTH_NOTE_MS / speedMultiplier;
+        const nextMoveTime = footstepTime + eighthNoteDelay;
         const nextMoveDelay = nextMoveTime - performance.now();
         setTimeout(() => moveCharacterToNext(charId), Math.max(0, nextMoveDelay));
     }, Math.max(0, footstepDelay));
@@ -621,7 +674,15 @@ function startGame() {
     // Start all characters with slight delays for variety
     const characterIds = Object.keys(CHARACTERS);
     characterIds.forEach((charId, index) => {
-        setTimeout(() => startCharacterAI(charId), 1000 + (index * 500));
+        setTimeout(() => {
+            const char = CHARACTERS[charId];
+            if (char.isBassline) {
+                // Bassline Bob: Start with initial bass note
+                const initialFreq = getRandomBassFrequency();
+                SoundEffects.startBassNote(initialFreq, char.bassVolume);
+            }
+            startCharacterAI(charId);
+        }, 1000 + (index * 500));
     });
 }
 

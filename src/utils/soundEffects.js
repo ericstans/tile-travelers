@@ -416,6 +416,54 @@ const SoundEffects = (() => {
         return playCharacterTargetReached(charId, arguments[1]);
     }
 
+    // Bass note management for Bassline Bob
+    let currentBassOscillator = null;
+    let currentBassGain = null;
+
+    function startBassNote(frequency, volume) {
+        if (!ensureAudioReady()) return;
+        
+        // Stop any existing bass note
+        stopBassNote();
+        
+        const ctx = getCtx();
+        const now = ctx.currentTime;
+        
+        // Create bass oscillator
+        currentBassOscillator = ctx.createOscillator();
+        currentBassGain = ctx.createGain();
+        
+        currentBassOscillator.type = 'sine';
+        currentBassOscillator.frequency.setValueAtTime(frequency, now);
+        
+        // Smooth fade in
+        currentBassGain.gain.setValueAtTime(0, now);
+        currentBassGain.gain.linearRampToValueAtTime(volume, now + 0.1); // 100ms fade in
+        
+        currentBassOscillator.connect(currentBassGain).connect(ctx.destination);
+        currentBassOscillator.start(now);
+    }
+
+    function stopBassNote() {
+        if (currentBassOscillator && currentBassGain) {
+            const ctx = getCtx();
+            const now = ctx.currentTime;
+            
+            // Smooth fade out
+            currentBassGain.gain.linearRampToValueAtTime(0, now + 0.1); // 100ms fade out
+            
+            // Stop oscillator after fade out
+            currentBassOscillator.stop(now + 0.1);
+            
+            currentBassOscillator = null;
+            currentBassGain = null;
+        }
+    }
+
+    function isBassNotePlaying() {
+        return currentBassOscillator !== null;
+    }
+
     return {
         playFootstep,
         playTargetDesignated,
@@ -431,7 +479,10 @@ const SoundEffects = (() => {
         isAudioReady,
         MASTER_BPM,
         BEAT_DURATION_MS,
-        EIGHTH_NOTE_MS
+        EIGHTH_NOTE_MS,
+        startBassNote,
+        stopBassNote,
+        isBassNotePlaying
     };
 })();
 
